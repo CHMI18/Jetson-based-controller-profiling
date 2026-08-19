@@ -1,0 +1,1 @@
+/usr/bin/cc  -O2 -Wall -Wextra   CMakeFiles/control_loop.dir/src/main.c.o CMakeFiles/control_loop.dir/src/model.c.o  -o control_loop  -lm -lrt 

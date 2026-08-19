@@ -1,0 +1,30 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+../include/model.h
+time.h
+-
+
+/home/jetson20/Desktop/Santiago/profiling_example/src/main.c
+stdio.h
+-
+stdlib.h
+-
+time.h
+-
+unistd.h
+-
+model.h
+/home/jetson20/Desktop/Santiago/profiling_example/src/model.h
+
+/home/jetson20/Desktop/Santiago/profiling_example/src/model.c
+model.h
+/home/jetson20/Desktop/Santiago/profiling_example/src/model.h
+stddef.h
+-
+
