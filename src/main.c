@@ -1,15 +1,19 @@
 #define _POSIX_C_SOURCE 200809L
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
 #include "model.h"
+#include "sysmon.h"
 
-
+/* Sized for the run's expected wall-clock duration (N_ITERS * DT_MS) at
+ * SYSMON_POLL_MS per sample, plus margin. If the monitor thread ever hits
+ * this cap it simply stops recording rather than overflowing. */
+#define SYSMON_CAPACITY ((N_ITERS * DT_MS) / SYSMON_POLL_MS + 32)
 
 int main(void) {
     double speed    = 0.0;
-    double voltage  = 0.0;
     double integral = 0.0;
 
     struct timespec next, wake_actual, prev_wake;
@@ -18,6 +22,21 @@ int main(void) {
     /* static: avoids a ~500-entry stack allocation and guarantees the
      * loop below does zero heap traffic. */
     static sample_t samples[N_ITERS];
+    static sysmon_sample_t sysmon_samples[SYSMON_CAPACITY];
+
+    sysmon_ctx_t sysmon_ctx;
+    sysmon_init(&sysmon_ctx, sysmon_samples, SYSMON_CAPACITY);
+    if (sysmon_ctx.gpu_available) {
+        printf("[sysmon] GPU node detected: %s\n", sysmon_ctx.gpu_path);
+    } else {
+        printf("[sysmon] No GPU sysfs node found among known candidates -- gpu_pct will read -1.\n");
+    }
+
+    pthread_t sysmon_thread;
+    if (pthread_create(&sysmon_thread, NULL, sysmon_thread_main, &sysmon_ctx) != 0) {
+        fprintf(stderr, "failed to start sysmon thread\n");
+        return 1;
+    }
 
     clock_gettime(CLOCK_MONOTONIC, &next);
     prev_wake = next;
@@ -26,16 +45,10 @@ int main(void) {
 
         /* --- Wait for the tick, then work. This is the standard
          * periodic-RT-task idiom (wake -> read inputs -> compute ->
-         * write outputs -> advance schedule)*/
-
-
+         * write outputs -> advance schedule), and it's what makes
+         * period_us/jitter_us below mean what they say. */
         add_ms(&next, DT_MS);
-        int rc = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &next, NULL);
-        if (rc != 0){
-          printf("Error: nanosleep \n");
-          return -1;
-        }
-
+        clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &next, NULL);
         clock_gettime(CLOCK_MONOTONIC, &wake_actual);
 
         long jitter_us = diff_us(next, wake_actual);        /* actual - target   */
@@ -44,7 +57,6 @@ int main(void) {
 
         clock_gettime(CLOCK_MONOTONIC, &t_s0);
         double sensed_speed = sensor_read(speed);
-        double sensed_voltage = sensor_read(voltage);
         clock_gettime(CLOCK_MONOTONIC, &t_s1);
 
         clock_gettime(CLOCK_MONOTONIC, &t_c0);
@@ -60,7 +72,6 @@ int main(void) {
          * speed to sense next tick. This call (and only this call)
          * disappears once actuator_write() drives a real actuator
          * and the plant evolves in real time instead of in code. */
-
         speed = plant_step(speed, applied_voltage, DT_S);
 
         long sensor_us   = diff_us(t_s0, t_s1);
@@ -70,6 +81,7 @@ int main(void) {
 
         sample_t *s        = &samples[i];
         s->iter            = i;
+        s->wake_time_s     = (double)wake_actual.tv_sec + (double)wake_actual.tv_nsec / 1e9;
         s->wake_jitter_us  = jitter_us;
         s->period_us       = period_us;
         s->sensor_us       = sensor_us;
@@ -87,18 +99,22 @@ int main(void) {
      * No stdio, no malloc, nothing schedule-sensitive happened above.
      * ================================================================== */
 
-    FILE *fp = fopen("profile_run.csv", "w");
+    atomic_store(&sysmon_ctx.stop, 1);
+    pthread_join(sysmon_thread, NULL);
+    sysmon_write_csv(&sysmon_ctx, "data/sysmon_run.csv");
+
+    FILE *fp = fopen("data/profile_run.csv", "w");
     if (fp == NULL) {
         perror("fopen");
         return 1;
     }
     fprintf(fp,
-        "iter,wake_jitter_us,period_us,sensor_us,control_us,actuator_us,"
+        "iter,wake_time_s,wake_jitter_us,period_us,sensor_us,control_us,actuator_us,"
         "total_exec_us,overrun_period,overrun_budget,speed,voltage\n");
     for (int i = 0; i < N_ITERS; i++) {
         sample_t *s = &samples[i];
-        fprintf(fp, "%d,%ld,%ld,%ld,%ld,%ld,%ld,%d,%d,%.6f,%.6f\n",
-                s->iter, s->wake_jitter_us, s->period_us,
+        fprintf(fp, "%d,%.6f,%ld,%ld,%ld,%ld,%ld,%ld,%d,%d,%.6f,%.6f\n",
+                s->iter, s->wake_time_s, s->wake_jitter_us, s->period_us,
                 s->sensor_us, s->control_us, s->actuator_us, s->total_exec_us,
                 s->overrun_period, s->overrun_budget, s->speed, s->voltage);
     }
@@ -132,7 +148,9 @@ int main(void) {
     printf("total_exec_us   min=%-6ld max=%-6ld mean=%.1f\n", st_total.min_us,  st_total.max_us,  st_total.mean_us);
     printf("overrun_period : %ld / %d (%.2f%%)\n", overrun_period_count, N_ITERS, 100.0 * overrun_period_count / N_ITERS);
     printf("overrun_budget : %ld / %d (%.2f%%)\n", overrun_budget_count, N_ITERS, 100.0 * overrun_budget_count / N_ITERS);
-    printf("Raw per-iteration samples written to profile_run.csv\n");
+    printf("Raw per-iteration samples written to data/profile_run.csv\n");
+    printf("sysmon: %ld samples written to data/sysmon_run.csv (gpu_available=%d)\n",
+           sysmon_ctx.count, sysmon_ctx.gpu_available);
 
     free(period_buf);
     free(jitter_buf);

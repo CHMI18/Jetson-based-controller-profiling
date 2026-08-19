@@ -1,3 +1,0 @@
-/home/jetson20/Desktop/Santiago/profiling_example/build/CMakeFiles/rebuild_cache.dir
-/home/jetson20/Desktop/Santiago/profiling_example/build/CMakeFiles/edit_cache.dir
-/home/jetson20/Desktop/Santiago/profiling_example/build/CMakeFiles/control_loop.dir
