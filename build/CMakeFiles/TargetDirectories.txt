@@ -1,0 +1,3 @@
+/home/jetson20/Desktop/Santiago/Jetson-based-controller-profiling/build/CMakeFiles/rebuild_cache.dir
+/home/jetson20/Desktop/Santiago/Jetson-based-controller-profiling/build/CMakeFiles/edit_cache.dir
+/home/jetson20/Desktop/Santiago/Jetson-based-controller-profiling/build/CMakeFiles/profiler.dir

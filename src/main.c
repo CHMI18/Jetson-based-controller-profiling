@@ -1,7 +1,9 @@
 #define _POSIX_C_SOURCE 200809L
+#include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 #include "model.h"
@@ -12,7 +14,21 @@
  * this cap it simply stops recording rather than overflowing. */
 #define SYSMON_CAPACITY ((N_ITERS * DT_MS) / SYSMON_POLL_MS + 32)
 
+/* git cannot track an empty directory -- data/ only ever contains
+ * gitignored *.csv files, so a fresh clone has no data/ directory at all
+ * even though it's in the repo's intended layout. Rather than depend on
+ * it happening to exist, create it here if needed. EEXIST is not an
+ * error -- it just means a previous run already created it. */
+static void ensure_dir(const char *path) {
+    if (mkdir(path, 0755) != 0 && errno != EEXIST) {
+        perror("mkdir");
+        fprintf(stderr, "Could not create '%s' -- CSV output will fail.\n", path);
+    }
+}
+
 int main(void) {
+    ensure_dir("data");
+
     double speed    = 0.0;
     double integral = 0.0;
 

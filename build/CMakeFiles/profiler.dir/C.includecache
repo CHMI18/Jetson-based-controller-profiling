@@ -1,0 +1,38 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+../include/model.h
+time.h
+-
+
+../include/sysmon.h
+time.h
+-
+stdatomic.h
+-
+
+/home/jetson20/Desktop/Santiago/Jetson-based-controller-profiling/src/main.c
+errno.h
+-
+pthread.h
+-
+stdio.h
+-
+stdlib.h
+-
+sys/stat.h
+-
+time.h
+-
+unistd.h
+-
+model.h
+/home/jetson20/Desktop/Santiago/Jetson-based-controller-profiling/src/model.h
+sysmon.h
+/home/jetson20/Desktop/Santiago/Jetson-based-controller-profiling/src/sysmon.h
+

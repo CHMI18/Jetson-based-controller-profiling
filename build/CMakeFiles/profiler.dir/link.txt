@@ -1,0 +1,1 @@
+/usr/bin/cc -O2   CMakeFiles/profiler.dir/src/main.c.o CMakeFiles/profiler.dir/src/model.c.o CMakeFiles/profiler.dir/src/sysmon.c.o  -o ../bin/profiler  -lpthread 

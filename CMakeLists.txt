@@ -27,6 +27,16 @@ add_executable(profiler
 )
 target_link_libraries(profiler PRIVATE Threads::Threads)
 
+# Explicit include search path -- do not rely on headers happening to sit
+# in the same directory as the .c files that include them. Both src/ and
+# include/ are listed so this works whether headers live alongside their
+# .c files (original layout) or have been split into a separate include/
+# directory, without needing this file updated every time one header moves.
+target_include_directories(profiler PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
+)
+
 # EXCLUDE_FROM_ALL: not built by a plain `cmake --build build`, matching
 # the old Makefile's `make` (builds profiler only) vs `make bench`
 # (builds the benchmark) distinction. Build it explicitly with:
